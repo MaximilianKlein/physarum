@@ -1,0 +1,192 @@
+<canvas id="canvas" height="64" width="64" style="image-rendering: pixelated;"></canvas>
+<script type="x-shader/x-fragment" id="fragment-shader-display">#version 300 es
+    precision mediump float;
+    uniform vec2 ImgSize;
+    uniform sampler2D state;
+    out vec4 FragColor;
+    void main(void) {
+      vec2 coord = vec2(gl_FragCoord.x/ImgSize.x, 1.0 - gl_FragCoord.y/ImgSize.y);
+      FragColor = texture(state, coord);
+    }
+  </script>
+  <script type="x-shader/x-fragment" id="fragment-shader-stepper">#version 300 es
+    precision mediump float;
+        
+    // our texture
+    uniform vec2 ImgSize;
+    uniform sampler2D previousState;
+
+    // calculated in here
+    out vec4 FragColor;
+
+    const float diffuseRate = 3.0;
+    const float deltaTime = 0.1;
+    const float decayRate = 0.03;
+
+    // Hash function www.cs.ubc.ca/~rbridson/docs/schechter-sca08-turbulence.pdf
+    // https://github.com/SebLague/Slime-Simulation/blob/main/Assets/Scripts/Slime/SlimeSim.compute
+    uint hash(uint state)
+    {
+        state ^= 2747636419u;
+        state *= 2654435769u;
+        state ^= state >> 16;
+        state *= 2654435769u;
+        state ^= state >> 16;
+        state *= 2654435769u;
+        return state;
+    }
+
+    float scaleToRange01(uint state)
+    {
+        return float(state) / 4294967295.0;
+    }
+
+
+    float saturate(float x)
+    {
+        return max(0.0, min(1.0, x));
+    }
+
+
+    void Diffuse (vec2 pos)
+    {
+        if (pos.x < 0.0 || pos.x >= ImgSize.x || pos.y < 0.0 || pos.y >= ImgSize.y) {
+            return;
+        }
+
+        vec4 originalCol = texture(previousState, vec2(pos.x / ImgSize.x, pos.y / ImgSize.y));
+        vec4 sum = vec4(0.0, 0.0, 0.0, 0.0);
+        // 3x3 blur
+        for (int offsetX = -1; offsetX <= 1; offsetX ++) {
+            for (int offsetY = -1; offsetY <= 1; offsetY ++) {
+                int sampleX = min(int(ImgSize.x)-1, max(0, int(pos.x) + offsetX));
+                int sampleY = min(int(ImgSize.y)-1, max(0, int(pos.y) + offsetY));
+                sum += texture(previousState, vec2(float(sampleX) / ImgSize.x, float(sampleY) / ImgSize.y));
+            }
+        }
+
+        vec4 blurredCol = sum / 9.0;
+        float diffuseWeight = saturate(diffuseRate * deltaTime);
+        blurredCol = originalCol * (1.0 - diffuseWeight) + blurredCol * (diffuseWeight);
+
+        //DiffusedTrailMap[id.xy] = blurredCol * saturate(1 - decayRate * deltaTime);
+        FragColor = vec4(
+            max(0.0, blurredCol.x - decayRate * deltaTime),
+            max(0.0, blurredCol.y - decayRate * deltaTime),
+            max(0.0, blurredCol.z - decayRate * deltaTime),
+            1
+        );
+    }
+        
+    void main() {
+        // Look up a color from the texture.
+        // FragColor = texture(u_image, v_texCoord);
+        Diffuse(vec2(gl_FragCoord.x, gl_FragCoord.y));
+    }
+  </script>
+  <script>
+    const startStateImg = new Image();
+    startStateImg.onload = function() {
+      const canvasEl = document.getElementById("canvas");
+      canvasEl.width = startStateImg.width;
+      canvasEl.height = startStateImg.height;
+      const gl = canvasEl.getContext("webgl2");
+  
+      function createShader(ty, src) {
+        const s = gl.createShader(ty);
+        gl.shaderSource(s, src);
+        gl.compileShader(s);
+        if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) {
+          console.error("Could not compile shader", ty, src, gl.getShaderInfoLog(s));
+        }
+        return s;
+      }
+      const vertexShader = createShader(gl.VERTEX_SHADER, "#version 300 es\nin vec2 coord; void main(void) { gl_Position = vec4(coord, 0.0, 1.0); }");
+      const fragShaderDisplay = createShader(gl.FRAGMENT_SHADER, document.getElementById("fragment-shader-display").innerText);
+      const fragShaderStepper = createShader(gl.FRAGMENT_SHADER, document.getElementById("fragment-shader-stepper").innerText);
+  
+      function createProgram(vs, fs) {
+        const p = gl.createProgram();
+        gl.attachShader(p, vs);
+        gl.attachShader(p, fs);
+        gl.linkProgram(p);
+        if (!gl.getProgramParameter(p, gl.LINK_STATUS)) {
+          console.error("Error linking program", gl.getProgramInfoLog(p));
+        }
+        return p;
+      }
+      const displayProg = createProgram(vertexShader, fragShaderDisplay);
+      const stepperProg = createProgram(vertexShader, fragShaderStepper);
+  
+      gl.useProgram(stepperProg);
+  
+      const stepperProgImgSize = gl.getUniformLocation(stepperProg, "ImgSize");
+      const stepperProgCoordLoc = gl.getAttribLocation(stepperProg, "coord");
+      const stepperProgPreviousStateLoc = gl.getUniformLocation(stepperProg, "previousState");
+  
+      const displayProgImgSize = gl.getUniformLocation(displayProg, "ImgSize");
+      const displayProgCoordLoc = gl.getAttribLocation(displayProg, "coord");
+      const displayProgStateLoc = gl.getUniformLocation(displayProg, "state");
+  
+      const vertexBuffer = gl.createBuffer();
+      gl.bindBuffer(gl.ARRAY_BUFFER, vertexBuffer);
+      gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([
+        -1,-1,  1,-1,  1,1,  -1,1,
+      ]), gl.STATIC_DRAW);
+  
+      // Note we must bind ARRAY_BUFFER before running vertexAttribPointer!
+      // This is confusing and deserves a blog post
+      // https://stackoverflow.com/questions/7617668/glvertexattribpointer-needed-everytime-glbindbuffer-is-called
+      gl.vertexAttribPointer(stepperProgCoordLoc, 2, gl.FLOAT, false, 0, 0);
+  
+      const elementBuffer = gl.createBuffer();
+      gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, elementBuffer);
+      gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint8Array([0,1,2,3]), gl.STATIC_DRAW);
+  
+      const texture0 = gl.createTexture();
+      gl.activeTexture(gl.TEXTURE0);
+      gl.bindTexture(gl.TEXTURE_2D, texture0);
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB, gl.RGB, gl.UNSIGNED_BYTE, startStateImg);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+      gl.generateMipmap(gl.TEXTURE_2D);
+  
+      const texture1 = gl.createTexture();
+      gl.activeTexture(gl.TEXTURE0+1);
+      gl.bindTexture(gl.TEXTURE_2D, texture1);
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB, gl.RGB, gl.UNSIGNED_BYTE, startStateImg);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+      gl.generateMipmap(gl.TEXTURE_2D);
+  
+      const framebuffers = [gl.createFramebuffer(), gl.createFramebuffer()];
+  
+      gl.bindFramebuffer(gl.FRAMEBUFFER, framebuffers[0]);
+      gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, texture0, 0);
+  
+      gl.bindFramebuffer(gl.FRAMEBUFFER, framebuffers[1]);
+      gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, texture1, 0);
+  
+      let nextStateIndex = 0;
+      function update() {
+        const previousStateIndex = 1 - nextStateIndex;
+  
+        gl.bindFramebuffer(gl.FRAMEBUFFER, framebuffers[nextStateIndex]);
+        gl.useProgram(stepperProg);
+        gl.enableVertexAttribArray(stepperProgCoordLoc);
+        gl.uniform1i(stepperProgPreviousStateLoc, previousStateIndex);
+        gl.uniform2f(stepperProgImgSize, startStateImg.width, startStateImg.height);
+        gl.drawElements(gl.TRIANGLE_FAN, 4, gl.UNSIGNED_BYTE, 0);
+        
+        gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+        gl.useProgram(displayProg);
+        gl.uniform2f(displayProgImgSize, startStateImg.width, startStateImg.height);
+        gl.drawElements(gl.TRIANGLE_FAN, 4, gl.UNSIGNED_BYTE, 0);
+  
+        nextStateIndex = previousStateIndex;
+        window.requestAnimationFrame(update);
+        };
+        window.requestAnimationFrame(update);
+    };
+    startStateImg.src = "img.jpeg";
+  </script>
