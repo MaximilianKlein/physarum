@@ -139,10 +139,16 @@ void main() {
 <script type = "x-shader/x-fragment" id="particle-render-frag">#version 300 es
 precision mediump float;
 
+uniform int u_SteckMode;
+
 out vec4 o_FragColor;
 
 void main() {
-    o_FragColor = vec4(1.0);
+    if (u_SteckMode == 0) {
+        o_FragColor = vec4(1.0);
+    } else {
+        o_FragColor = vec4(1.0, 1.0, 0.5, 1.0);
+    }
 }
 </script>
 <script type="x-shader/x-fragment" id="fragment-shader-display">#version 300 es
@@ -456,6 +462,9 @@ void main() {
         // gl.bindFramebuffer(gl.FRAMEBUFFER, null);
         gl.bindVertexArray(vaos[cnt % 2]);
         gl.useProgram(vertexRenderProg);
+        gl.uniform1i(
+          gl.getUniformLocation(vertexRenderProg, "u_SteckMode"),
+          document.getElementById('steckmode').checked ? 1 : 0);   
         gl.drawArrays(gl.POINTS, 0, num_particles);
         gl.bindVertexArray(null);
 
@@ -492,3 +501,6 @@ void main() {
 <span>u_SensorSize(<span id="sensorSizeValue">5</span>)</span><input type="range" min="1" max="10" value="5" class="slider" id="sensorSize">
 <span>u_SensorAngleRad(<span id="sensorAngleRadValue">0.4</span>)</span><input type="range" min="1" max="140" value="40" class="slider" id="sensorAngleRad">
 <span>u_TurnSpeed(<span id="turnSpeedValue">3.0</span>)</span><input type="range" min="1" max="50000" value="30" class="slider" id="turnSpeed">
+<div>
+    <span>Steck Mode 😎</span><input type="checkbox" id="steckmode" name="steckmode">
+</div>
