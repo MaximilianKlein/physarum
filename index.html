@@ -3,7 +3,14 @@
 precision mediump float;
 
 uniform float u_TimeDelta;
+uniform float u_TotalTime;
+uniform float u_SensorOffsetDst;
+uniform int u_SensorSize;
+uniform float u_SensorAngleRad;
+uniform float u_TurnSpeed;
 uniform vec2 u_ImgSize;
+
+uniform sampler2D state;
 
 in vec2 i_Position;
 in vec2 i_Velocity;
@@ -11,26 +18,99 @@ in vec2 i_Velocity;
 out vec2 v_Position;
 out vec2 v_Velocity;
 
+// Hash function www.cs.ubc.ca/~rbridson/docs/schechter-sca08-turbulence.pdf
+// https://github.com/SebLague/Slime-Simulation/blob/main/Assets/Scripts/Slime/SlimeSim.compute
+uint hash(uint state)
+{
+    state ^= 2747636419u;
+    state *= 2654435769u;
+    state ^= state >> 16;
+    state *= 2654435769u;
+    state ^= state >> 16;
+    state *= 2654435769u;
+    return state;
+}
+
+float scaleToRange01(uint state)
+{
+    return float(state) / 4294967295.0;
+}
+
+
+float saturate(float x)
+{
+    return max(0.0, min(1.0, x));
+}
+
+float sense(vec2 agentPosition, float agentAngle, float sensorAngleOffset) {
+	float sensorAngle = agentAngle + sensorAngleOffset;
+	vec2 sensorDir = vec2(cos(sensorAngle), sin(sensorAngle));
+
+	vec2 sensorPos = agentPosition + sensorDir * u_SensorOffsetDst;
+	int sensorCentreX = int((sensorPos.x + 1.0)*u_ImgSize.x*0.5);
+	int sensorCentreY = int((sensorPos.y + 1.0)*u_ImgSize.y*0.5);
+
+	float sum = 0.0;
+
+	//int4 senseWeight = agent.speciesMask * 2 - 1;
+
+	for (int offsetX = -u_SensorSize; offsetX <= u_SensorSize; offsetX ++) {
+		for (int offsetY = -u_SensorSize; offsetY <= u_SensorSize; offsetY ++) {
+            int sampleX = min(int(u_ImgSize.x)-1, max(0, sensorCentreX + offsetX));
+            int sampleY = min(int(u_ImgSize.y)-1, max(0, sensorCentreY + offsetY));
+            sum += texture(state, vec2(float(sampleX) / u_ImgSize.x, float(sampleY) / u_ImgSize.y)).x;
+
+			//sum += dot(senseWeight, TrailMap[int2(sampleX,sampleY)]);
+            //sum += dot(senseWeight, TrailMap[int2(sampleX,sampleY)]);
+		}
+	}
+
+	return sum;
+}
 
 void main() {
-  vec2 newPos = i_Position + i_Velocity * u_TimeDelta;
-  vec2 newVel = i_Velocity;
-  if (newPos.x < -1.0 && newVel.x < 0.0) {
+  vec2 newVel = normalize(i_Velocity);
+  if (i_Position.x < -1.0 && newVel.x < 0.0) {
       newVel.x = -newVel.x;
-      newPos.x = newPos.x + 2.0*newVel.x*u_TimeDelta;
   }
-  if (newPos.x > 1.0 && newVel.x > 0.0) {
+  if (i_Position.x > 1.0 && newVel.x > 0.0) {
     newVel.x = -newVel.x;
-    newPos.x = newPos.x + 2.0*newVel.x*u_TimeDelta;
   }
-  if (newPos.y < -1.0 && newVel.y < 0.0) {
+  if (i_Position.y < -1.0 && newVel.y < 0.0) {
       newVel.y = -newVel.y;
-      newPos.y = newPos.y + 2.0*newVel.y*u_TimeDelta;
   }
-  if (newPos.y > 1.0 && newVel.y > 0.0) {
+  if (i_Position.y > 1.0 && newVel.y > 0.0) {
       newVel.y = -newVel.y;
-      newPos.y = newPos.y + 2.0*newVel.y*u_TimeDelta;
   }
+
+  float angle = atan(newVel.y, newVel.x);
+
+  float weightForward = sense(i_Position, angle, 0.0);
+  float weightLeft = sense(i_Position, angle, -u_SensorAngleRad);
+  float weightRight = sense(i_Position, angle, u_SensorAngleRad);
+
+  uint random = hash(uint(i_Position.y * u_ImgSize.x + i_Position.x) + hash(uint(gl_VertexID) + uint(u_TotalTime)));
+  float randomSteerStrength = scaleToRange01(random);
+
+  // Continue in same direction
+    if (weightForward > weightLeft && weightForward > weightRight) {
+        angle += 0.0;
+    }
+    /*else if (weightForward < weightLeft && weightForward < weightRight) {
+        angle += (randomSteerStrength - 0.5) * 2.0 * u_TurnSpeed * u_TimeDelta;
+    }*/
+    // Turn right
+    else
+    if (weightRight > weightLeft) {
+        angle -= randomSteerStrength * u_TurnSpeed * u_TimeDelta;
+    }
+    // Turn left
+    else if (weightLeft > weightRight) {
+        angle += randomSteerStrength * u_TurnSpeed * u_TimeDelta;
+    }
+    newVel = vec2(cos(angle), sin(angle))*0.3;
+
+  vec2 newPos = i_Position + newVel * u_TimeDelta;
   
   v_Position = newPos;
   v_Velocity = newVel;
@@ -274,12 +354,23 @@ void main() {
       function initialParticleData(num_parts) {
         var data = [];
         for (var i = 0; i < num_parts; ++i) {
-            data.push(Math.random() * 2 - 1);
-            data.push(Math.random() * 2 - 1);
-            data.push(Math.random() * 1 - 0.5);
-            data.push(Math.random() * 1 - 0.5);
+            let x = Math.random() * 2 - 1;
+            let y = Math.random() * 2 - 1;
+            data.push(x);
+            data.push(y);
+            data.push(-x);
+            data.push(-y);
         }
         // console.log(data);
+
+        // data.push(0);
+        // data.push(0);
+        // data.push(1);
+        // data.push(0);
+        // data.push(-0.02);
+        // data.push(0.1);
+        // data.push(1);
+        // data.push(0);
         return data;
       }
 
@@ -318,10 +409,33 @@ void main() {
         const idx3 = (cnt + 2) % 3;
   
         gl.useProgram(vertexUpdateProg);
+        gl.uniform1i(gl.getUniformLocation(vertexUpdateProg, "state"), idx1)
+
         gl.uniform1f(
           gl.getUniformLocation(vertexUpdateProg, "u_TimeDelta"),
           1.0/60.0);
 
+        
+        gl.uniform1f(
+          gl.getUniformLocation(vertexUpdateProg, "u_TotalTime"),
+          1.0/60.0 * cnt);
+
+        gl.uniform1f(
+          gl.getUniformLocation(vertexUpdateProg, "u_SensorOffsetDst"),
+          parseInt(document.getElementById('sensorOffsetDst').value)/1000.0);
+
+        gl.uniform1i(
+          gl.getUniformLocation(vertexUpdateProg, "u_SensorSize"),
+          parseInt(document.getElementById('sensorSize').value));
+
+        gl.uniform1f(
+          gl.getUniformLocation(vertexUpdateProg, "u_SensorAngleRad"),
+          parseInt(document.getElementById('sensorAngleRad').value)/100.0);          
+
+        gl.uniform1f(
+          gl.getUniformLocation(vertexUpdateProg, "u_TurnSpeed"),
+          parseInt(document.getElementById('turnSpeed').value)/10.0);  
+          
         gl.uniform2f(
             gl.getUniformLocation(vertexUpdateProg, "u_ImgSize"),
             startStateImg.width, startStateImg.height);
@@ -373,3 +487,8 @@ void main() {
   </script>
 
 <button onclick="update()">Update</button>
+
+<span>u_SensorOffsetDst(<span id="sensorOffsetDstValue">0.03</span>)</span><input type="range" min="1" max="140" value="30" class="slider" id="sensorOffsetDst">
+<span>u_SensorSize(<span id="sensorSizeValue">5</span>)</span><input type="range" min="1" max="10" value="5" class="slider" id="sensorSize">
+<span>u_SensorAngleRad(<span id="sensorAngleRadValue">0.4</span>)</span><input type="range" min="1" max="140" value="40" class="slider" id="sensorAngleRad">
+<span>u_TurnSpeed(<span id="turnSpeedValue">3.0</span>)</span><input type="range" min="1" max="50000" value="30" class="slider" id="turnSpeed">
