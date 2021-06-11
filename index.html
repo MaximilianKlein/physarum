@@ -1,5 +1,5 @@
-<canvas id="canvas" height="64" width="64" style="image-rendering: pixelated;"></canvas>
-<script type = "x-shader/x-vertex" id = "particle-update-vert">#version 300 es
+<canvas id="canvas" height="64" width="64"></canvas>
+<script type="x-shader/x-vertex" id="particle-update-vert">#version 300 es
 precision mediump float;
 
 uniform float u_TimeDelta;
@@ -100,8 +100,7 @@ void main() {
         angle += (randomSteerStrength - 0.5) * 2.0 * u_TurnSpeed * u_TimeDelta;
     }*/
     // Turn right
-    else
-    if (weightRight > weightLeft) {
+    else if (weightRight > weightLeft) {
         angle -= randomSteerStrength * u_TurnSpeed * u_TimeDelta;
     }
     // Turn left
@@ -117,11 +116,11 @@ void main() {
   
 }
 </script>
-<script type = "x-shader/x-fragment" id = "passthru-frag-shader">#version 300 es
+<script type="x-shader/x-fragment" id="passthru-frag-shader">#version 300 es
 precision mediump float;
 void main() { discard; }
 </script>
-<script type = "x-shader/x-vertex" id = "particle-render-vert">#version 300 es
+<script type="x-shader/x-vertex" id="particle-render-vert">#version 300 es
 precision mediump float;
 
 in vec2 i_Position;
@@ -129,6 +128,7 @@ in vec2 i_Velocity;
 
 void main() {
     gl_PointSize = 1.0;
+    // disable optimization??
     if (i_Velocity.x > 1000000.0) {
         gl_Position = vec4(i_Position, 0.0001, 1.0);
     } else {
@@ -136,7 +136,7 @@ void main() {
     }
 }
 </script>
-<script type = "x-shader/x-fragment" id="particle-render-frag">#version 300 es
+<script type="x-shader/x-fragment" id="particle-render-frag">#version 300 es
 precision mediump float;
 
 uniform int u_SteckMode;
@@ -161,7 +161,7 @@ void main() {
       FragColor = texture(state, coord);
     }
   </script>
-  <script type="x-shader/x-fragment" id="fragment-shader-stepper">#version 300 es
+<script type="x-shader/x-fragment" id="fragment-shader-stepper">#version 300 es
     precision mediump float;
         
     // our texture
@@ -174,25 +174,6 @@ void main() {
     const float diffuseRate = 3.0;
     const float deltaTime = 0.1;
     const float decayRate = 0.30000;
-
-    // Hash function www.cs.ubc.ca/~rbridson/docs/schechter-sca08-turbulence.pdf
-    // https://github.com/SebLague/Slime-Simulation/blob/main/Assets/Scripts/Slime/SlimeSim.compute
-    uint hash(uint state)
-    {
-        state ^= 2747636419u;
-        state *= 2654435769u;
-        state ^= state >> 16;
-        state *= 2654435769u;
-        state ^= state >> 16;
-        state *= 2654435769u;
-        return state;
-    }
-
-    float scaleToRange01(uint state)
-    {
-        return float(state) / 4294967295.0;
-    }
-
 
     float saturate(float x)
     {
@@ -236,271 +217,19 @@ void main() {
         Diffuse(vec2(gl_FragCoord.x, gl_FragCoord.y));
     }
   </script>
-  <script>
-    const startStateImg = new Image();
-    startStateImg.onload = function() {
-      const canvasEl = document.getElementById("canvas");
-      canvasEl.width = startStateImg.width;
-      canvasEl.height = startStateImg.height;
-      const gl = canvasEl.getContext("webgl2");
-  
-      function createShader(ty, src) {
-        const s = gl.createShader(ty);
-        gl.shaderSource(s, src);
-        gl.compileShader(s);
-        if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) {
-          console.error("Could not compile shader", ty, src, gl.getShaderInfoLog(s));
-        }
-        return s;
-      }
-      const vertexShader = createShader(gl.VERTEX_SHADER, "#version 300 es\nin vec2 coord; void main(void) { gl_Position = vec4(coord, 0.0, 1.0); }");
-      const fragShaderDisplay = createShader(gl.FRAGMENT_SHADER, document.getElementById("fragment-shader-display").innerText);
-      const fragShaderStepper = createShader(gl.FRAGMENT_SHADER, document.getElementById("fragment-shader-stepper").innerText);
-      const vertexUpdateShader = createShader(gl.VERTEX_SHADER, document.getElementById("particle-update-vert").innerText);
-      const fragDiscardShader = createShader(gl.FRAGMENT_SHADER, document.getElementById("passthru-frag-shader").innerText);
-      const vertexRenderShader = createShader(gl.VERTEX_SHADER, document.getElementById("particle-render-vert").innerText);
-      const fragVerticesShader = createShader(gl.FRAGMENT_SHADER, document.getElementById("particle-render-frag").innerText);
-      
-      function createProgram(vs, fs, transform_feedback_varyings) {
-        const p = gl.createProgram();
-        gl.attachShader(p, vs);
-        gl.attachShader(p, fs);
-        if (transform_feedback_varyings != null) {
-            gl.transformFeedbackVaryings(p, transform_feedback_varyings, gl.INTERLEAVED_ATTRIBS);
-        }
-        gl.linkProgram(p);
-        if (!gl.getProgramParameter(p, gl.LINK_STATUS)) {
-          console.error("Error linking program", gl.getProgramInfoLog(p));
-        }
-        return p;
-      }
-      const vertexUpdateProg = createProgram(vertexUpdateShader, fragDiscardShader, ["v_Position", "v_Velocity"]);
-      const vertexRenderProg = createProgram(vertexRenderShader, fragVerticesShader);
-      const displayProg = createProgram(vertexShader, fragShaderDisplay);
-      const stepperProg = createProgram(vertexShader, fragShaderStepper);
-  
-      gl.useProgram(stepperProg);
-  
-      const stepperProgImgSize = gl.getUniformLocation(stepperProg, "ImgSize");
-      const stepperProgCoordLoc = gl.getAttribLocation(stepperProg, "coord");
-      const stepperProgPreviousStateLoc = gl.getUniformLocation(stepperProg, "previousState");
-  
-      const displayProgImgSize = gl.getUniformLocation(displayProg, "ImgSize");
-      const displayProgCoordLoc = gl.getAttribLocation(displayProg, "coord");
-      const displayProgStateLoc = gl.getUniformLocation(displayProg, "state");
-  
-      const vertexBuffer = gl.createBuffer();
-      gl.bindBuffer(gl.ARRAY_BUFFER, vertexBuffer);
-      gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([
-        -1,-1,  1,-1,  1,1,  -1,1,
-      ]), gl.STATIC_DRAW);
-  
-      // Note we must bind ARRAY_BUFFER before running vertexAttribPointer!
-      // This is confusing and deserves a blog post
-      // https://stackoverflow.com/questions/7617668/glvertexattribpointer-needed-everytime-glbindbuffer-is-called
-      gl.vertexAttribPointer(stepperProgCoordLoc, 2, gl.FLOAT, false, 0, 0);
-  
-      const elementBuffer = gl.createBuffer();
-      gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, elementBuffer);
-      gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint8Array([0,1,2,3]), gl.STATIC_DRAW);
-
-
-      function blackImg(size_x, size_y) {
-        var d = [];
-        for (var i = 0; i < size_x * size_y; ++i) {
-            d.push(0);
-            d.push(0);
-            d.push(0);
-        }
-        return new Uint8Array(d);
-        }
-    
-
-      const initialImage = blackImg(startStateImg.width, startStateImg.height);
-  
-      const texture0 = gl.createTexture();
-      gl.activeTexture(gl.TEXTURE0);
-      gl.bindTexture(gl.TEXTURE_2D, texture0);
-      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB, startStateImg.width, startStateImg.height, 0, gl.RGB, gl.UNSIGNED_BYTE, initialImage);
-      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
-      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
-      gl.generateMipmap(gl.TEXTURE_2D);
-  
-      const texture1 = gl.createTexture();
-      gl.activeTexture(gl.TEXTURE0+1);
-      gl.bindTexture(gl.TEXTURE_2D, texture1);
-      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB, startStateImg.width, startStateImg.height, 0, gl.RGB, gl.UNSIGNED_BYTE, initialImage);
-      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
-      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
-      gl.generateMipmap(gl.TEXTURE_2D);
-
-      const texture2 = gl.createTexture();
-      gl.activeTexture(gl.TEXTURE0+2);
-      gl.bindTexture(gl.TEXTURE_2D, texture2);
-      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB, startStateImg.width, startStateImg.height, 0, gl.RGB, gl.UNSIGNED_BYTE, initialImage);
-      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
-      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
-      gl.generateMipmap(gl.TEXTURE_2D);
-  
-      const framebuffers = [gl.createFramebuffer(), gl.createFramebuffer(), gl.createFramebuffer()];
-  
-      gl.bindFramebuffer(gl.FRAMEBUFFER, framebuffers[0]);
-      gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, texture0, 0);
-  
-      gl.bindFramebuffer(gl.FRAMEBUFFER, framebuffers[1]);
-      gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, texture1, 0);
-  
-      gl.bindFramebuffer(gl.FRAMEBUFFER, framebuffers[2]);
-      gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, texture2, 0);
-  
-
-      const vaos = [gl.createVertexArray(), gl.createVertexArray()];
-      const buffers = [gl.createBuffer(), gl.createBuffer()];
-    
-      function initialParticleData(num_parts) {
-        var data = [];
-        for (var i = 0; i < num_parts; ++i) {
-            let x = Math.random() * 2 - 1;
-            let y = Math.random() * 2 - 1;
-            data.push(x);
-            data.push(y);
-            data.push(-x);
-            data.push(-y);
-        }
-        // console.log(data);
-
-        // data.push(0);
-        // data.push(0);
-        // data.push(1);
-        // data.push(0);
-        // data.push(-0.02);
-        // data.push(0.1);
-        // data.push(1);
-        // data.push(0);
-        return data;
-      }
-
-      const num_particles = 100000;
-      var initial_data =
-        new Float32Array(initialParticleData(num_particles));
-
-      gl.bindVertexArray(vaos[0]);
-      gl.bindBuffer(gl.ARRAY_BUFFER, buffers[0]);
-      gl.bufferData(gl.ARRAY_BUFFER, initial_data, gl.STREAM_DRAW);
-      const attribLocationCalc = gl.getAttribLocation(vertexUpdateProg, 'i_Position');
-      const attribVelocityCalc = gl.getAttribLocation(vertexUpdateProg, 'i_Velocity');
-      gl.enableVertexAttribArray(attribLocationCalc);
-      gl.vertexAttribPointer(attribLocationCalc, 2, gl.FLOAT, false, 4*4, 0);
-      gl.enableVertexAttribArray(attribVelocityCalc);
-      gl.vertexAttribPointer(attribVelocityCalc, 2, gl.FLOAT, false, 4*4, 8);
-      gl.bindVertexArray(null);
-      gl.bindBuffer(gl.ARRAY_BUFFER, null);
-
-      gl.bindVertexArray(vaos[1]);
-      gl.bindBuffer(gl.ARRAY_BUFFER, buffers[1]);
-      gl.bufferData(gl.ARRAY_BUFFER, initial_data, gl.STREAM_DRAW);
-      const attribLocationDraw = gl.getAttribLocation(vertexRenderProg, 'i_Position');
-      const attribVelocityDraw = gl.getAttribLocation(vertexRenderProg, 'i_Velocity');
-      gl.enableVertexAttribArray(attribLocationDraw);
-      gl.vertexAttribPointer(attribLocationDraw, 2, gl.FLOAT, false, 4*4, 0);
-      gl.enableVertexAttribArray(attribVelocityDraw);
-      gl.vertexAttribPointer(attribVelocityDraw, 2, gl.FLOAT, false, 4*4, 8);
-      gl.bindVertexArray(null);
-      gl.bindBuffer(gl.ARRAY_BUFFER, null);
-   
-      let cnt = 0;
-      function update() {
-        const idx1 = cnt % 3;
-        const idx2 = (cnt + 1) % 3;
-        const idx3 = (cnt + 2) % 3;
-  
-        gl.useProgram(vertexUpdateProg);
-        gl.uniform1i(gl.getUniformLocation(vertexUpdateProg, "state"), idx1)
-
-        gl.uniform1f(
-          gl.getUniformLocation(vertexUpdateProg, "u_TimeDelta"),
-          1.0/60.0);
-
-        
-        gl.uniform1f(
-          gl.getUniformLocation(vertexUpdateProg, "u_TotalTime"),
-          1.0/60.0 * cnt);
-
-        gl.uniform1f(
-          gl.getUniformLocation(vertexUpdateProg, "u_SensorOffsetDst"),
-          parseInt(document.getElementById('sensorOffsetDst').value)/1000.0);
-
-        gl.uniform1i(
-          gl.getUniformLocation(vertexUpdateProg, "u_SensorSize"),
-          parseInt(document.getElementById('sensorSize').value));
-
-        gl.uniform1f(
-          gl.getUniformLocation(vertexUpdateProg, "u_SensorAngleRad"),
-          parseInt(document.getElementById('sensorAngleRad').value)/100.0);          
-
-        gl.uniform1f(
-          gl.getUniformLocation(vertexUpdateProg, "u_TurnSpeed"),
-          parseInt(document.getElementById('turnSpeed').value)/10.0);  
-          
-        gl.uniform2f(
-            gl.getUniformLocation(vertexUpdateProg, "u_ImgSize"),
-            startStateImg.width, startStateImg.height);
-
-            // console.log('binding', cnt % 2);
-            // console.log('transforming', (cnt + 1)%2);
-        gl.bindVertexArray(vaos[cnt % 2]);
-        gl.bindBufferBase(
-            gl.TRANSFORM_FEEDBACK_BUFFER, 0, buffers[(cnt + 1)%2]);
-        gl.enable(gl.RASTERIZER_DISCARD);
-        gl.beginTransformFeedback(gl.POINTS);
-        gl.drawArrays(gl.POINTS, 0, num_particles);
-        gl.endTransformFeedback();
-        gl.disable(gl.RASTERIZER_DISCARD);
-        gl.bindBufferBase(gl.TRANSFORM_FEEDBACK_BUFFER, 0, null);
-        
-        gl.bindFramebuffer(gl.FRAMEBUFFER, framebuffers[idx1]);
-        // gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-        gl.bindVertexArray(vaos[cnt % 2]);
-        gl.useProgram(vertexRenderProg);
-        gl.uniform1i(
-          gl.getUniformLocation(vertexRenderProg, "u_SteckMode"),
-          document.getElementById('steckmode').checked ? 1 : 0);   
-        gl.drawArrays(gl.POINTS, 0, num_particles);
-        gl.bindVertexArray(null);
-
-        gl.bindFramebuffer(gl.FRAMEBUFFER, framebuffers[idx2]);
-        gl.useProgram(stepperProg);
-        gl.enableVertexAttribArray(stepperProgCoordLoc);
-        gl.uniform1i(stepperProgPreviousStateLoc, idx1);
-        gl.uniform2f(stepperProgImgSize, startStateImg.width, startStateImg.height);
-        gl.drawElements(gl.TRIANGLE_FAN, 4, gl.UNSIGNED_BYTE, 0);
-        
-        gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-        gl.useProgram(displayProg);
-        gl.uniform1i(displayProgStateLoc, idx2)
-        gl.uniform2f(displayProgImgSize, startStateImg.width, startStateImg.height);
-        gl.drawElements(gl.TRIANGLE_FAN, 4, gl.UNSIGNED_BYTE, 0);
-
-        window.requestAnimationFrame(update);
-        // gl.bindBuffer(gl.ARRAY_BUFFER, buffers[(cnt + 1)%2]);
-        // var arrBuffer = new Float32Array(initialParticleData(num_particles));
-        // gl.getBufferSubData(gl.ARRAY_BUFFER, 0, arrBuffer);
-        // gl.bindVertexArray(null);
-        // console.log(arrBuffer);
-        cnt++;
-        };
-        window.requestAnimationFrame(update);
-        window.update = update;
-    };
-    startStateImg.src = "img.jpeg";
-  </script>
-
-<button onclick="update()">Update</button>
-
-<span>u_SensorOffsetDst(<span id="sensorOffsetDstValue">0.03</span>)</span><input type="range" min="1" max="140" value="30" class="slider" id="sensorOffsetDst">
-<span>u_SensorSize(<span id="sensorSizeValue">5</span>)</span><input type="range" min="1" max="10" value="5" class="slider" id="sensorSize">
-<span>u_SensorAngleRad(<span id="sensorAngleRadValue">0.4</span>)</span><input type="range" min="1" max="140" value="40" class="slider" id="sensorAngleRad">
-<span>u_TurnSpeed(<span id="turnSpeedValue">3.0</span>)</span><input type="range" min="1" max="50000" value="30" class="slider" id="turnSpeed">
+<script src="index.js"></script>
+<br />
+<button onclick="update()">Manual Update</button>
+<div>
+    <span>u_SensorOffsetDst(<span id="sensorOffsetDstValue">0.03</span>)</span><input type="range" min="1" max="200"
+        value="30" class="slider" id="sensorOffsetDst">
+    <span>u_SensorSize(<span id="sensorSizeValue">5</span>)</span><input type="range" min="1" max="10" value="5"
+        class="slider" id="sensorSize">
+    <span>u_SensorAngleRad(<span id="sensorAngleRadValue">0.4</span>)</span><input type="range" min="1" max="140"
+        value="40" class="slider" id="sensorAngleRad">
+    <span>u_TurnSpeed(<span id="turnSpeedValue">3.0</span>)</span><input type="range" min="1" max="50000" value="30"
+        class="slider" id="turnSpeed">
+</div>
 <div>
     <span>Steck Mode 😎</span><input type="checkbox" id="steckmode" name="steckmode">
 </div>

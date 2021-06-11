@@ -1,4 +1,4 @@
-
+<!-- heavily inspired by https://gpfault.net/posts/webgl2-particles.txt.html -->
 <!DOCTYPE html>
 <html>
   <head>
@@ -288,6 +288,7 @@ function render(gl, state, timestamp_millis) {
   state.old_timestamp = timestamp_millis;
   gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
   gl.useProgram(state.particle_update_program);
+
   gl.uniform1f(
     gl.getUniformLocation(state.particle_update_program, "u_TimeDelta"),
     time_delta / 1000.0);
@@ -310,11 +311,16 @@ function render(gl, state, timestamp_millis) {
     gl.getUniformLocation(state.particle_update_program, "u_MaxSpeed"),
     state.max_speed);
   state.total_time += time_delta;
+
+
   gl.activeTexture(gl.TEXTURE0);
   gl.bindTexture(gl.TEXTURE_2D, state.rg_noise);
   gl.uniform1i(
     gl.getUniformLocation(state.particle_update_program, "u_RgNoise"),
     0);
+
+
+
   gl.bindVertexArray(state.particle_sys_vaos[state.read]);
   gl.bindBufferBase(
     gl.TRANSFORM_FEEDBACK_BUFFER, 0, state.particle_sys_buffers[state.write]);
@@ -324,6 +330,10 @@ function render(gl, state, timestamp_millis) {
   gl.endTransformFeedback();
   gl.disable(gl.RASTERIZER_DISCARD);
   gl.bindBufferBase(gl.TRANSFORM_FEEDBACK_BUFFER, 0, null);
+
+
+
+
   gl.bindVertexArray(state.particle_sys_vaos[state.read]);
   gl.useProgram(state.particle_render_program);
   gl.drawArrays(gl.POINTS, 0, state.num_particles);
@@ -343,7 +353,7 @@ function main() {
     var state =
       init(
         webgl_context,
-        10000,
+        10000,                                                     /////// PARTICLES HERE
         Math.PI/2.0 - 0.5, Math.PI/2.0 + 0.5,
         0.5, 1.0);
     canvas_element.onmousemove = function(e) {
