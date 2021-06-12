@@ -54,6 +54,7 @@ float sense(vec2 agentPosition, float agentAngle, float sensorAngleOffset) {
 
 	//int4 senseWeight = agent.speciesMask * 2 - 1;
 
+    // (sensorSize x 2) x (sensorSize x 2)
 	for (int offsetX = -u_SensorSize; offsetX <= u_SensorSize; offsetX ++) {
 		for (int offsetY = -u_SensorSize; offsetY <= u_SensorSize; offsetY ++) {
             int sampleX = min(int(u_ImgSize.x)-1, max(0, sensorCentreX + offsetX));
@@ -221,15 +222,27 @@ void main() {
 <br />
 <button onclick="update()">Manual Update</button>
 <div>
-    <span>u_SensorOffsetDst(<span id="sensorOffsetDstValue">0.03</span>)</span><input type="range" min="1" max="200"
-        value="30" class="slider" id="sensorOffsetDst">
+    <span>u_SensorOffsetDst(<span id="sensorOffsetDstValue">0.185</span>)</span><input type="range" min="1" max="200"
+        value="185" class="slider" id="sensorOffsetDst">
     <span>u_SensorSize(<span id="sensorSizeValue">5</span>)</span><input type="range" min="1" max="10" value="5"
         class="slider" id="sensorSize">
-    <span>u_SensorAngleRad(<span id="sensorAngleRadValue">0.4</span>)</span><input type="range" min="1" max="140"
-        value="40" class="slider" id="sensorAngleRad">
-    <span>u_TurnSpeed(<span id="turnSpeedValue">3.0</span>)</span><input type="range" min="1" max="50000" value="30"
+    <span>u_SensorAngleRad(<span id="sensorAngleRadValue">0.91</span>)</span><input type="range" min="1" max="140"
+        value="91" class="slider" id="sensorAngleRad">
+    <span>u_TurnSpeed(<span id="turnSpeedValue">39775.0</span> * DeltaTime)</span><input type="range" min="1" max="50000" value="39775"
         class="slider" id="turnSpeed">
 </div>
+<script>
+    [
+        {input: 'sensorOffsetDst', value: 'sensorOffsetDstValue', factor: 0.001},
+        {input: 'sensorSize', value: 'sensorSizeValue', factor: 1},
+        {input: 'sensorAngleRad', value: 'sensorAngleRadValue', factor: 0.01},
+        {input: 'turnSpeed', value: 'turnSpeedValue', factor: 1},
+    ].forEach((conf) => {
+        document.getElementById(conf.input).onchange = function() {
+            document.getElementById(conf.value).innerHTML = parseInt(document.getElementById(conf.input).value)*conf.factor
+        }
+    });
+</script>
 <div>
     <span>Steck Mode 😎</span><input type="checkbox" id="steckmode" name="steckmode">
 </div>
