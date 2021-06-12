@@ -265,7 +265,9 @@ window.onload = function () {
             gl.drawElements(gl.TRIANGLE_FAN, 4, gl.UNSIGNED_BYTE, 0);
         }
 
-        window.requestAnimationFrame(update);
+        if (!window.manual) {
+            window.requestAnimationFrame(update);
+        }
         // DEBUG TRANSFORM FEEDBACK
         {
             // gl.bindBuffer(gl.ARRAY_BUFFER, buffers[(cnt + 1)%2]);
@@ -278,4 +280,14 @@ window.onload = function () {
     };
     window.requestAnimationFrame(update);
     window.update = update;
+
+    window.manualUpdate = function() {
+        window.manual = true;
+        update();
+    }
+
+    window.automaticUpdate = function() {
+        window.manual = false;
+        update();
+    }
 };

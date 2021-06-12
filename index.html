@@ -1,4 +1,53 @@
-<canvas id="canvas" height="64" width="64"></canvas>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+    <meta name="description" content="Physarum WebGL experiment.">
+    <style>
+        body {
+            background-color: lightgray;
+        }
+        .content {
+            max-width: 800px;
+            background-color: white;
+            box-shadow: rgb(57, 60, 63);
+            margin-left: auto;
+            margin-right: auto;
+            padding: 1em;
+            border-radius: 5px;
+        }
+
+        .canvascontainer {
+            margin-left: calc(-50vw + 50%);
+            min-width: 100vw;
+            position: relative;
+            position: relative;
+            margin-top: 20px;
+            margin-bottom: 20px;
+        }
+
+        .canvascontainer canvas {
+            background-color: white;
+            padding: 5px;
+            margin: 0 auto;
+            display: block;
+            border-radius: 5px;
+            min-height: 800px;
+            min-width: 1000px;
+        }
+    </style>
+</head>
+<body>
+<div class="content">
+    <h1>Physarum Slime-Mold WebGL Experiment</h1>
+
+    For details visit the <a href="https://github.com/MaximilianKlein/physarum">GitHub project</a>
+<div class="canvascontainer">
+    <canvas id="canvas" height="64" width="64"></canvas>
+</div>
 <script type="x-shader/x-vertex" id="particle-update-vert">#version 300 es
 precision mediump float;
 
@@ -219,30 +268,37 @@ void main() {
     }
   </script>
 <script src="index.js"></script>
-<br />
-<button onclick="update()">Manual Update</button>
 <div>
-    <span>u_SensorOffsetDst(<span id="sensorOffsetDstValue">0.185</span>)</span><input type="range" min="1" max="200"
-        value="185" class="slider" id="sensorOffsetDst">
-    <span>u_SensorSize(<span id="sensorSizeValue">5</span>)</span><input type="range" min="1" max="10" value="5"
-        class="slider" id="sensorSize">
-    <span>u_SensorAngleRad(<span id="sensorAngleRadValue">0.91</span>)</span><input type="range" min="1" max="140"
-        value="91" class="slider" id="sensorAngleRad">
-    <span>u_TurnSpeed(<span id="turnSpeedValue">39775.0</span> * DeltaTime)</span><input type="range" min="1" max="50000" value="39775"
-        class="slider" id="turnSpeed">
+    <h2>Controls</h2>
+    <button onclick="manualUpdate()">Manual Update</button> 
+    <button onclick="automaticUpdate()">Automatic Update</button>
+
+    <div>
+        <span>u_SensorOffsetDst(<span id="sensorOffsetDstValue">0.185</span>)</span><input type="range" min="1" max="200"
+            value="185" class="slider" id="sensorOffsetDst">
+        <span>u_SensorSize(<span id="sensorSizeValue">5</span>)</span><input type="range" min="1" max="10" value="5"
+            class="slider" id="sensorSize">
+        <span>u_SensorAngleRad(<span id="sensorAngleRadValue">0.91</span>)</span><input type="range" min="1" max="140"
+            value="91" class="slider" id="sensorAngleRad">
+        <span>u_TurnSpeed(<span id="turnSpeedValue">39775.0</span> * DeltaTime)</span><input type="range" min="1" max="50000" value="39775"
+            class="slider" id="turnSpeed">
+    </div>
+    <script>
+        [
+            {input: 'sensorOffsetDst', value: 'sensorOffsetDstValue', factor: 0.001},
+            {input: 'sensorSize', value: 'sensorSizeValue', factor: 1},
+            {input: 'sensorAngleRad', value: 'sensorAngleRadValue', factor: 0.01},
+            {input: 'turnSpeed', value: 'turnSpeedValue', factor: 1},
+        ].forEach((conf) => {
+            document.getElementById(conf.input).onchange = function() {
+                document.getElementById(conf.value).innerHTML = parseInt(document.getElementById(conf.input).value)*conf.factor
+            }
+        });
+    </script>
+    <div>
+        <span>Steck Mode 😎</span><input type="checkbox" id="steckmode" name="steckmode">
+    </div>
 </div>
-<script>
-    [
-        {input: 'sensorOffsetDst', value: 'sensorOffsetDstValue', factor: 0.001},
-        {input: 'sensorSize', value: 'sensorSizeValue', factor: 1},
-        {input: 'sensorAngleRad', value: 'sensorAngleRadValue', factor: 0.01},
-        {input: 'turnSpeed', value: 'turnSpeedValue', factor: 1},
-    ].forEach((conf) => {
-        document.getElementById(conf.input).onchange = function() {
-            document.getElementById(conf.value).innerHTML = parseInt(document.getElementById(conf.input).value)*conf.factor
-        }
-    });
-</script>
-<div>
-    <span>Steck Mode 😎</span><input type="checkbox" id="steckmode" name="steckmode">
 </div>
+</body>
+</html>
