@@ -30,7 +30,3 @@ This takes the rendered particles and simply applies a diffusion (or a simply bl
 then makes sure that the traces decay over time.
 
 I started this part with an Game-Of-Life example and adapted it to diffuse and decay. You can find the example here: https://jameshfisher.com/2017/10/22/webgl-game-of-life/
-
-## Open issues
-
-There is still a bug that causes the top half of the screen to behave differently and produces more noisy results.
