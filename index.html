@@ -96,8 +96,8 @@ float sense(vec2 agentPosition, float agentAngle, float sensorAngleOffset) {
 	vec2 sensorDir = vec2(cos(sensorAngle), sin(sensorAngle));
 
 	vec2 sensorPos = agentPosition + sensorDir * u_SensorOffsetDst;
-	int sensorCentreX = int((sensorPos.x + 1.0)*u_ImgSize.x*0.5);
-	int sensorCentreY = int((sensorPos.y + 1.0)*u_ImgSize.y*0.5);
+	int sensorCentreX = int(sensorPos.x*u_ImgSize.x);
+	int sensorCentreY = int(sensorPos.y*u_ImgSize.y);
 
 	float sum = 0.0;
 
@@ -120,13 +120,13 @@ float sense(vec2 agentPosition, float agentAngle, float sensorAngleOffset) {
 
 void main() {
   vec2 newVel = normalize(i_Velocity);
-  if (i_Position.x < -1.0 && newVel.x < 0.0) {
+  if (i_Position.x < 0.0 && newVel.x < 0.0) {
       newVel.x = -newVel.x;
   }
   if (i_Position.x > 1.0 && newVel.x > 0.0) {
     newVel.x = -newVel.x;
   }
-  if (i_Position.y < -1.0 && newVel.y < 0.0) {
+  if (i_Position.y < 0.0 && newVel.y < 0.0) {
       newVel.y = -newVel.y;
   }
   if (i_Position.y > 1.0 && newVel.y > 0.0) {
@@ -178,11 +178,10 @@ in vec2 i_Velocity;
 
 void main() {
     gl_PointSize = 1.0;
-    // disable optimization??
     if (i_Velocity.x > 1000000.0) {
-        gl_Position = vec4(i_Position, 0.0001, 1.0);
+        gl_Position = vec4(i_Position * 2.0 - vec2(1.0,1.0), 0.0001, 1.0);
     } else {
-        gl_Position = vec4(i_Position, 0.0, 1.0);
+        gl_Position = vec4(i_Position * 2.0 - vec2(1.0,1.0), 0.0, 1.0);
     }
 }
 </script>
@@ -230,7 +229,6 @@ void main() {
         return max(0.0, min(1.0, x));
     }
 
-
     void Diffuse (vec2 pos)
     {
         if (pos.x < 0.0 || pos.x >= ImgSize.x || pos.y < 0.0 || pos.y >= ImgSize.y) {
@@ -274,8 +272,8 @@ void main() {
     <button onclick="automaticUpdate()">Automatic Update</button>
 
     <div>
-        <span>u_SensorOffsetDst(<span id="sensorOffsetDstValue">0.185</span>)</span><input type="range" min="1" max="200"
-            value="185" class="slider" id="sensorOffsetDst">
+        <span>u_SensorOffsetDst(<span id="sensorOffsetDstValue">0.097</span>)</span><input type="range" min="1" max="200"
+            value="97" class="slider" id="sensorOffsetDst">
         <span>u_SensorSize(<span id="sensorSizeValue">5</span>)</span><input type="range" min="1" max="10" value="5"
             class="slider" id="sensorSize">
         <span>u_SensorAngleRad(<span id="sensorAngleRadValue">0.91</span>)</span><input type="range" min="1" max="140"

@@ -131,23 +131,13 @@ window.onload = function () {
     function initialParticleData(num_parts) {
         var data = [];
         for (var i = 0; i < num_parts; ++i) {
-            let x = Math.random() * 2 - 1;
-            let y = Math.random() * 2 - 1;
+            let x = Math.random();
+            let y = Math.random();
             data.push(x);
             data.push(y);
-            data.push(-x);
-            data.push(-y);
+            data.push(-(x - 0.5));
+            data.push(-(y - 0.5));
         }
-        // console.log(data);
-
-        // data.push(0);
-        // data.push(0);
-        // data.push(1);
-        // data.push(0);
-        // data.push(-0.02);
-        // data.push(0.1);
-        // data.push(1);
-        // data.push(0);
         return data;
     }
 
@@ -221,8 +211,6 @@ window.onload = function () {
                 gl.getUniformLocation(vertexUpdateProg, "u_ImgSize"),
                 width, height);
 
-            // console.log('binding', cnt % 2);
-            // console.log('transforming', (cnt + 1)%2);
             gl.bindVertexArray(vaos[cnt % 2]);
             gl.bindBufferBase(
                 gl.TRANSFORM_FEEDBACK_BUFFER, 0, buffers[(cnt + 1) % 2]);
@@ -236,7 +224,6 @@ window.onload = function () {
         // DRAW VERTICES
         {
             gl.bindFramebuffer(gl.FRAMEBUFFER, framebuffers[idx1]);
-            // gl.bindFramebuffer(gl.FRAMEBUFFER, null);
             gl.bindVertexArray(vaos[cnt % 2]);
             gl.useProgram(vertexRenderProg);
             gl.uniform1i(
@@ -274,7 +261,6 @@ window.onload = function () {
             // var arrBuffer = new Float32Array(initialParticleData(num_particles));
             // gl.getBufferSubData(gl.ARRAY_BUFFER, 0, arrBuffer);
             // gl.bindVertexArray(null);
-            // console.log(arrBuffer);
         }
         cnt++;
     };
